@@ -33,7 +33,7 @@ class ProSRGenerator(nn.Module):
             out = getattr(self, "pyramid_%d" % i)(out)
             if i == num_pyramids - 1:
                 out = getattr(self, "reconst_%d" % i)(out)
-                out += F.interpolate(x, scale_factor=2 ** (i + 1), mode="bicubic", align_corners=True).clamp(0, 1)
+                out += F.interpolate(x.detach(), scale_factor=2 ** (i + 1), mode="bicubic", align_corners=True).clamp(0, 1)
         return out
 
     def get_valid_upscalefactor(self, upscale_factor):

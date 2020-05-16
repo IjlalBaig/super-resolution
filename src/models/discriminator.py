@@ -25,7 +25,6 @@ class ProSRDiscriminator(nn.Module):
         upscale_factor = self.get_valid_upscalefactor(upscale_factor)
         num_pyramids = int(log2(upscale_factor))
 
-        out = x
         for i in range(num_pyramids)[::-1]:
             if i == num_pyramids - 1:
                 out = self.interpolate(x, scale_factor=1 / 2 ** (num_pyramids - i - 1))
