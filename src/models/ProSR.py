@@ -82,7 +82,7 @@ class ProSR(ptl.LightningModule):
         upscale_factor = 2 ** (itr_pyramid_id + 1)
         if optimizer_idx == 0:
             gen_out, fake_labels = self(x, upscale_factor)
-            g_loss = fake_labels.mean()
+            g_loss = ((fake_labels - 1) ** 2).mean()
 
             tqdm_dict = {"g_loss": g_loss}
             output = OrderedDict({
@@ -95,7 +95,7 @@ class ProSR(ptl.LightningModule):
         if optimizer_idx == 1:
             gen_out, fake_labels = self(x, upscale_factor)
             real_labels = self(y, upscale_factor, disc_only=True)
-            d_loss = (real_labels - fake_labels).mean()
+            d_loss = (fake_labels ** 2 + (real_labels - 1) ** 2).mean()
 
             tqdm_dict = {"d_loss": d_loss}
             output = OrderedDict({
@@ -145,8 +145,8 @@ class ProSR(ptl.LightningModule):
 
         gen_out, fake_labels = self(x, upscale_factor)
         real_labels = self(y, upscale_factor, disc_only=True)
-        g_loss = fake_labels.mean()
-        d_loss = (real_labels - fake_labels).mean()
+        g_loss = ((fake_labels - 1) ** 2).mean()
+        d_loss = (fake_labels ** 2 + (real_labels - 1) ** 2).mean()
 
         if batch_idx == 0:
             self.log_images(x, y, gen_out)
