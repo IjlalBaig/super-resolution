@@ -22,7 +22,7 @@ logger = logging.getLogger(__file__)
 from src.tools.dataset import SRDataset
 from src.models.generator import ProSRGenerator
 from src.models.discriminator import ProSRDiscriminator
-from src.models.loss import GANLoss
+from src.models.loss import GANLoss, VGGLoss
 
 
 class ProSR(ptl.LightningModule):
@@ -44,6 +44,7 @@ class ProSR(ptl.LightningModule):
         disc_params = dict(in_planes=in_planes,
                            planes_cfg=planes_cfg)
         self.discriminator = ProSRDiscriminator(**disc_params)
+        self.vgg_loss = VGGLoss()
 
     def forward(self, x, upscale_factor, disc_only=False):
         if disc_only:
@@ -83,10 +84,10 @@ class ProSR(ptl.LightningModule):
         if optimizer_idx == 0:
             gen_out, fake_labels = self(x, upscale_factor)
             g_loss = ((fake_labels - 1) ** 2).mean()
-
-            tqdm_dict = {"g_loss": g_loss}
+            vgg_loss = self.vgg_loss(gen_out, y)
+            tqdm_dict = {"g_loss": g_loss, "vgg_loss": vgg_loss}
             output = OrderedDict({
-                "loss": g_loss,
+                "loss": g_loss + vgg_loss,
                 "progress_bar": tqdm_dict,
                 "log": tqdm_dict
             })
@@ -161,9 +162,10 @@ class ProSR(ptl.LightningModule):
         avg_g_loss = torch.stack([x["g_loss"] for x in outs]).mean()
         avg_d_loss = torch.stack([x["d_loss"] for x in outs]).mean()
         tqdm_dict = {"d_loss": avg_d_loss, "g_loss": avg_g_loss}
-        return {"avg_g_loss": avg_g_loss,
-                "avg_d_loss": avg_d_loss,
-                "progress_bar": tqdm_dict,
-                "log": tqdm_dict}
+        output = OrderedDict({
+            "val_loss": avg_g_loss,
+            "progress_bar": tqdm_dict,
+            "log": tqdm_dict})
+        return output
 
 
