@@ -82,7 +82,7 @@ class ProSR(ptl.LightningModule):
         upscale_factor = 2 ** (itr_pyramid_id + 1)
         if optimizer_idx == 0:
             gen_out, fake_labels = self(x, upscale_factor)
-            g_loss = ((fake_labels - 1) ** 2).mean()
+            g_loss = fake_labels.mean()
 
             tqdm_dict = {"g_loss": g_loss}
             output = OrderedDict({
@@ -95,7 +95,7 @@ class ProSR(ptl.LightningModule):
         if optimizer_idx == 1:
             gen_out, fake_labels = self(x, upscale_factor)
             real_labels = self(y, upscale_factor, disc_only=True)
-            d_loss = (fake_labels ** 2 + (real_labels - 1) ** 2).mean()
+            d_loss = (real_labels - fake_labels).mean()
 
             tqdm_dict = {"d_loss": d_loss}
             output = OrderedDict({
@@ -105,26 +105,23 @@ class ProSR(ptl.LightningModule):
             })
             return output
 
+    def optimizer_step( self, epoch, batch_idx, optimizer, optimizer_idx, second_order_closure):
 
+        if optimizer_idx == 0:
+            optimizer.step()
+            optimizer.zero_grad()
 
-    # def optimizer_step( self, epoch, batch_idx, optimizer, optimizer_idx):
-    #     if optimizer_idx == 0:
-    #         if batch_idx % 2 == 0:
-    #             optimizer.step()
-    #             optimizer.zero_grad()
-    #
-    #     # update discriminator opt every 4 steps
-    #     if optimizer_idx == 1:
-    #         if batch_idx % 4 == 0:
-    #             optimizer.step()
-    #             optimizer.zero_grad()
-    #     pass
+        if optimizer_idx == 1:
+            if batch_idx % self.opts.get("gen_steps_per_update", 10) == 0:
+                optimizer.step()
+                optimizer.zero_grad()
+        pass
 
     def val_dataloader(self):
         val_path = self.opts.get("val_path")
         batch_size = self.opts.get("batch_size")
         num_workers = self.opts.get("num_workers")
-        return DataLoader(SRDataset(val_path), batch_size=batch_size, shuffle=True,
+        return DataLoader(SRDataset(val_path), batch_size=batch_size, shuffle=False,
                           pin_memory=True, num_workers=num_workers)
 
     def log_images(self, x, y, pred):
@@ -148,8 +145,8 @@ class ProSR(ptl.LightningModule):
 
         gen_out, fake_labels = self(x, upscale_factor)
         real_labels = self(y, upscale_factor, disc_only=True)
-        g_loss = ((fake_labels - 1) ** 2).mean()
-        d_loss = (fake_labels ** 2 + (real_labels - 1) ** 2).mean()
+        g_loss = fake_labels.mean()
+        d_loss = (real_labels - fake_labels).mean()
 
         if batch_idx == 0:
             self.log_images(x, y, gen_out)
