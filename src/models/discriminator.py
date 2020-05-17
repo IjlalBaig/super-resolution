@@ -20,6 +20,7 @@ class ProSRDiscriminator(nn.Module):
             self.add_module("pyramid_%d" % i, PyramidDownBlock(in_planes=plane_cfg[0],
                                                                downplanes_config=plane_cfg))
         self.sigmoid = nn.Sigmoid()
+        self.init_weights()
 
     def forward(self, x, upscale_factor=None):
         upscale_factor = self.get_valid_upscalefactor(upscale_factor)
@@ -47,6 +48,16 @@ class ProSRDiscriminator(nn.Module):
                     upscale_factor, valid_upscale_factors))
                 raise SystemExit(1)
         return upscale_factor
+
+    def init_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.xavier_normal_(m.weight)
+                if m.bias is not None:
+                    m.bias.data.zero_()
+            elif isinstance(m, nn.Linear):
+                nn.init.xavier_normal_(m.weight)
+                m.bias.data.zero_()
 
 
 
