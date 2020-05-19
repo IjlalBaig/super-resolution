@@ -14,18 +14,30 @@ def conv1x1(in_planes, out_planes, stride=1, bias=False):
     return nn.Conv2d(in_planes, out_planes, kernel_size=1, stride=stride, bias=bias)
 
 
+class Mish(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, x):
+        x = x * (torch.tanh(torch.nn.functional.softplus(x)))
+        return x
+
 class DenseLayer(nn.Module):
     def __init__(self, in_planes, out_planes, bn_size):
         super(DenseLayer, self).__init__()
         planes = out_planes * bn_size
         self.conv1 = conv1x1(in_planes, planes, bias=True)
-        self.relu1 = nn.ReLU(inplace=False)
+        self.mish1 = Mish()
+        self.gn1 = nn.GroupNorm(planes // 2, planes)
         self.conv2 = conv3x3(planes, out_planes, bias=True)
+        self.mish2 = Mish()
+        self.gn2 = nn.GroupNorm(out_planes // 2, out_planes)
 
     def forward(self, x):
         out = self.conv1(x)
-        out = self.relu1(out)
+        out = self.gn1(self.mish1(out))
         out = self.conv2(out)
+        out = self.gn2(self.mish2(out))
         return torch.cat([x, out], 1)
 
 
@@ -33,10 +45,11 @@ class CompressionLayer(nn.Module):
     def __init__(self, in_planes, out_planes, drop_rate=0.0):
         super(CompressionLayer, self).__init__()
         self.conv1 = conv1x1(in_planes, out_planes)
+        self.gn1 = nn.GroupNorm(out_planes // 2, out_planes)
         self.drop_rate = drop_rate
 
     def forward(self, x):
-        out = self.conv1(x)
+        out = self.gn1(self.conv1(x))
         if self.drop_rate > 0:
             out = F.dropout(out, p=self.drop_rate, inplace=False, training=self.training)
         return out
@@ -66,12 +79,13 @@ class PixelShuffleUpsampler(nn.Module):
         super(PixelShuffleUpsampler, self).__init__()
         self.conv = conv3x3(in_planes, (upscale_factor ** 2) * out_planes)
         self.shfl = nn.PixelShuffle(upscale_factor)
-        self.prelu = nn.PReLU()
+        self.mish = Mish()
+        self.gn = nn.GroupNorm(out_planes // 2, out_planes)
 
     def forward(self, x):
         x = self.conv(x)
         x = self.shfl(x)
-        return self.prelu(x)
+        return self.gn(self.mish(x))
 
 
 class PyramidUpBlock(nn.Module):
@@ -105,13 +119,15 @@ class DownLayer(nn.Module):
     def __init__(self, in_planes, out_planes):
         super(DownLayer, self).__init__()
         self.conv1 = conv3x3(in_planes, out_planes, bias=True)
-        self.relu1 = nn.ReLU(inplace=False)
+        self.mish1 = Mish()
+        self.gn1 = nn.GroupNorm(out_planes // 2, out_planes)
         self.conv2 = conv3x3(out_planes, out_planes, bias=True)
-        self.relu2 = nn.ReLU(inplace=False)
+        self.mish2 = Mish()
+        self.gn2 = nn.GroupNorm(out_planes // 2, out_planes)
         self.avg = nn.AvgPool2d(2)
 
     def forward(self, x):
-        for module in self.children():
+        for name, module in self.named_children():
             x = module(x)
         return x
 

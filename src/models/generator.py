@@ -2,7 +2,7 @@ from torch import nn
 import torch.nn.functional as F
 from math import log2
 
-from src.models.components import conv3x3, PyramidUpBlock
+from src.models.components import conv3x3, PyramidUpBlock, Mish
 
 import logging
 logger = logging.getLogger(__file__)
@@ -34,10 +34,10 @@ class ProSRGenerator(nn.Module):
         for i in range(num_pyramids):
             out = getattr(self, "pyramid_%d" % i)(out)
             if i == num_pyramids - 1:
-                out_hi = F.relu(getattr(self, "reconst_%d" % i)(out))
+                out_hi = Mish()(getattr(self, "reconst_%d" % i)(out))
                 out_lo = F.interpolate(x.detach(), scale_factor=2 ** (i + 1), mode="bicubic", align_corners=True).clamp(0, 1)
                 out = out_hi * out_lo
-        return out.clamp(0, 1), out_hi
+        return F.sigmoid(out), out_hi
 
     def get_valid_upscalefactor(self, upscale_factor):
         if upscale_factor is None:
