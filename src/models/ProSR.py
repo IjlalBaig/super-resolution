@@ -50,8 +50,8 @@ class ProSR(ptl.LightningModule):
         if disc_only:
             return self.discriminator(x, upscale_factor)
         else:
-            gen_out = self.generator(x, upscale_factor)
-            return gen_out, self.discriminator(gen_out, upscale_factor)
+            gen_out, _ = self.generator(x, upscale_factor)
+            return gen_out, self.discriminator(gen_out, upscale_factor), _
 
     def configure_optimizers(self):
         lr_gen = self.opts.get("lr_gen", 1e-3)
@@ -82,7 +82,7 @@ class ProSR(ptl.LightningModule):
 
         upscale_factor = 2 ** (itr_pyramid_id + 1)
         if optimizer_idx == 0:
-            gen_out, fake_labels = self(x, upscale_factor)
+            gen_out, fake_labels, _ = self(x, upscale_factor)
             g_loss = ((fake_labels - 1) ** 2).mean()
             vgg_loss = self.vgg_loss(gen_out, y)
             tqdm_dict = {"g_loss": g_loss, "vgg_loss": vgg_loss}
@@ -94,7 +94,7 @@ class ProSR(ptl.LightningModule):
             return output
 
         if optimizer_idx == 1:
-            gen_out, fake_labels = self(x, upscale_factor)
+            gen_out, fake_labels, _ = self(x, upscale_factor)
             real_labels = self(y, upscale_factor, disc_only=True)
             d_loss = (fake_labels ** 2 + (real_labels - 1) ** 2).mean()
 
@@ -125,9 +125,11 @@ class ProSR(ptl.LightningModule):
         return DataLoader(SRDataset(val_path), batch_size=batch_size, shuffle=False,
                           pin_memory=True, num_workers=num_workers)
 
-    def log_images(self, x, y, pred):
+    def log_images(self, x, y, pred, pred_hi):
+        x = F.interpolate(x.detach(), scale_factor=2, mode="bicubic", align_corners=True).clamp(0, 1)
         self.logger.experiment.add_image("input", make_grid(x), self.current_epoch)
         self.logger.experiment.add_image("pred", make_grid(pred), self.current_epoch)
+        self.logger.experiment.add_image("pred_hi", make_grid(pred_hi), self.current_epoch)
         self.logger.experiment.add_image("true", make_grid(y), self.current_epoch)
 
     def validation_step(self, batch, batch_idx):
@@ -144,13 +146,13 @@ class ProSR(ptl.LightningModule):
 
         upscale_factor = 2 ** (itr_pyramid_id + 1)
 
-        gen_out, fake_labels = self(x, upscale_factor)
+        gen_out, fake_labels, _ = self(x, upscale_factor)
         real_labels = self(y, upscale_factor, disc_only=True)
         g_loss = ((fake_labels - 1) ** 2).mean()
         d_loss = (fake_labels ** 2 + (real_labels - 1) ** 2).mean()
 
         if batch_idx == 0:
-            self.log_images(x, y, gen_out)
+            self.log_images(x, y, gen_out, _)
 
         output = OrderedDict({
             "g_loss": g_loss,
