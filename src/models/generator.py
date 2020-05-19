@@ -37,7 +37,7 @@ class ProSRGenerator(nn.Module):
                 out_hi = Mish()(getattr(self, "reconst_%d" % i)(out))
                 out_lo = F.interpolate(x.detach(), scale_factor=2 ** (i + 1), mode="bicubic", align_corners=True).clamp(0, 1)
                 out = out_hi * out_lo
-        return F.sigmoid(out), out_hi
+        return F.hardtanh(out, 0, 1), out_hi
 
     def get_valid_upscalefactor(self, upscale_factor):
         if upscale_factor is None:
