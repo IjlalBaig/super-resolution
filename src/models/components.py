@@ -77,16 +77,14 @@ class DenseCompressionBlock(nn.Module):
 class PixelShuffleUpsampler(nn.Module):
     def __init__(self, in_planes, out_planes, upscale_factor):
         super(PixelShuffleUpsampler, self).__init__()
-        self.conv1 = conv3x3(in_planes, (upscale_factor ** 2) * out_planes)
+        self.conv = conv3x3(in_planes, (upscale_factor ** 2) * out_planes)
         self.shfl = nn.PixelShuffle(upscale_factor)
-        self.conv2 = conv3x3(out_planes, out_planes)
         self.mish = Mish()
         self.gn = nn.GroupNorm(out_planes // 2, out_planes)
 
     def forward(self, x):
-        x = self.conv1(x)
+        x = self.conv(x)
         x = self.shfl(x)
-        x = self.conv2(x)
         return self.gn(self.mish(x))
 
 
