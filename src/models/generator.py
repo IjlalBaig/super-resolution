@@ -2,7 +2,7 @@ from torch import nn
 import torch.nn.functional as F
 from math import log2
 
-from src.models.components import conv3x3, PyramidUpBlock, Mish
+from src.models.components import conv3x3, PyramidUpBlock, ReconstructionBlock
 
 import logging
 logger = logging.getLogger(__file__)
@@ -22,7 +22,7 @@ class ProSRGenerator(nn.Module):
                                                              denseblock_config=block_cfg,
                                                              bn_size=bn_size,
                                                              growth_rate=growth_rate))
-            self.add_module("reconst_%d" % i, conv3x3(planes, in_planes))
+            self.add_module("reconst_%d" % i, ReconstructionBlock)
 
             self.init_weights()
 
@@ -34,7 +34,7 @@ class ProSRGenerator(nn.Module):
         for i in range(num_pyramids):
             out = getattr(self, "pyramid_%d" % i)(out)
             if i == num_pyramids - 1:
-                out_hi = Mish()(getattr(self, "reconst_%d" % i)(out))
+                out_hi = getattr(self, "reconst_%d" % i)(out)
                 out_lo = F.interpolate(x.detach(), scale_factor=2 ** (i + 1), mode="bicubic", align_corners=True).clamp(0, 1)
                 out = out_hi * out_lo
         return F.hardtanh(out, 0, 1), out_hi

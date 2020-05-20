@@ -144,3 +144,14 @@ class PyramidDownBlock(nn.Module):
             x = module(x)
         return x
 
+
+class ReconstructionBlock(nn.Module):
+    def __init__(self, in_planes, out_planes):
+        super(ReconstructionBlock, self).__init__()
+        self.conv1 = conv3x3(in_planes, out_planes)
+        self.conv2 = conv3x3(out_planes, out_planes)
+
+    def forward(self, x):
+        x = F.relu(self.conv1(x))
+        x = F.relu(self.conv2(x))
+        return x
