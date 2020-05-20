@@ -4,6 +4,14 @@ import tarfile
 from pathlib import Path
 import subprocess as sp
 from tqdm import tqdm
+import yaml
+
+def read_yaml(fpath):
+    with open(fpath, 'r') as f:
+        try:
+            return yaml.safe_load(f)
+        except yaml.YAMLError as exc:
+            print(exc)
 
 def collect_fpaths(dpath, suffixes):
     """

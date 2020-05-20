@@ -13,17 +13,15 @@ def _arg_parser():
     parser.add_argument("--ckpt-path",  type=str, help="Checkpoint file to initialize model")
 
     parser.add_argument("-w", "--num-workers", type=int, default=4, help="Number of workers for data loader")
-    parser.add_argument("-lr", "--learning-rate", type=float, default=1e-3)
-    parser.add_argument("-b", "--batch-size", type=int, default=8)
     parser.add_argument("--epochs", type=int, default=100)
-    parser.add_argument("-ac", "--accumulate-batches", type=int, default=16, help="Number of batch gradients "
+    parser.add_argument("-ac", "--accumulate-batches", type=int, default=1, help="Number of batch gradients "
                                                                                   "accumulated before backward pass. "
                                                                                   "Helps simulate training with larger "
                                                                                   "batch size")
     parser.add_argument("--gpu-count", type=int, default=1)
     parser.add_argument("--model", type=str, default="ProSR", choices=["ProSR"])
     parser.add_argument("-m", "--mode", type=str, default="train", choices=["train", "test"])
-    parser.add_argument("-p", "--precision", type=int, default=16, choices=[16, 32])
+    parser.add_argument("-p", "--precision", type=int, default=32, choices=[16, 32])
 
     return parser
 

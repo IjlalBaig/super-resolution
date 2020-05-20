@@ -23,50 +23,45 @@ from src.tools.dataset import SRDataset
 from src.models.generator import ProSRGenerator
 from src.models.discriminator import ProSRDiscriminator
 from src.models.loss import GANLoss, VGGLoss
+from argparse import Namespace
 
 
 class ProSR(ptl.LightningModule):
-    def __init__(self, in_planes=3, pyramid_in_planes=32, growth_rate=2, bn_size=4, **opts):
+    def __init__(self, model_cfg, **opts):
         super(ProSR, self).__init__()
-        # todo: pass are args after testing
-        blocks_cfg = [[4, 4, 4, 4, 4, 4], [4, 4, 4], [4]]
-        planes_cfg = [[64, 128, 256, 512], [64], [64]]
-        # todo: end
-        self.opts = opts
-        self.num_pyramids = len(blocks_cfg)
-        gen_params = dict(in_planes=in_planes,
-                          planes=pyramid_in_planes,
-                          blocks_cfg=blocks_cfg,
-                          growth_rate=growth_rate,
-                          bn_size=bn_size)
-        self.generator = ProSRGenerator(**gen_params)
+        self.h_params = Namespace(**model_cfg.h_params)
+        self.opts = Namespace(**opts)
+        G_cfg = Namespace(**model_cfg.G)
+        D_cfg = Namespace(**model_cfg.D)
 
-        disc_params = dict(in_planes=in_planes,
-                           planes_cfg=planes_cfg)
-        self.discriminator = ProSRDiscriminator(**disc_params)
+        num_up_pyramids = len(G_cfg.blocks_cfg)
+        num_down_pyramids = len(D_cfg.planes_cfg)
+        assert num_up_pyramids == num_down_pyramids, \
+            "num_up_pyramids == num_down_pyramids"
+        self.num_pyramids = num_up_pyramids
+
+        self.G = ProSRGenerator(G_cfg)
+        self.D = ProSRDiscriminator(D_cfg)
         self.vgg_loss = VGGLoss()
 
     def forward(self, x, upscale_factor, disc_only=False):
         if disc_only:
-            return self.discriminator(x, upscale_factor)
+            return self.D(x, upscale_factor)
         else:
-            gen_out, _ = self.generator(x, upscale_factor)
-            return gen_out, self.discriminator(gen_out, upscale_factor), _
+            gen_out, _ = self.G(x, upscale_factor)
+            return gen_out, self.D(gen_out, upscale_factor), _
 
     def configure_optimizers(self):
-        lr_gen = self.opts.get("lr_gen", 1e-3)
-        optim_gen = torch.optim.Adam(self.generator.parameters(), lr=lr_gen)
-
-        lr_disc = self.opts.get("lr_disc", 1e-3)
-        optim_disc = torch.optim.Adam(self.discriminator.parameters(), lr=lr_disc)
-        return [optim_gen, optim_disc]
+        optim_G= torch.optim.Adam(self.G.parameters(), lr=self.h_params.G_lr)
+        optim_D = torch.optim.Adam(self.D.parameters(), lr=self.h_params.D_lr)
+        return [optim_G, optim_D]
 
     def train_dataloader(self):
-        train_path = self.opts.get("train_path")
-        batch_size = self.opts.get("batch_size")
-        num_workers = self.opts.get("num_workers")
-        return DataLoader(SRDataset(train_path), batch_size=batch_size, shuffle=True,
-                          pin_memory=True, num_workers=num_workers)
+        return DataLoader(SRDataset(self.opts.train_path),
+                          batch_size=self.h_params.batch_size,
+                          num_workers=self.opts.num_workers,
+                          pin_memory=True,
+                          shuffle=True)
 
     def training_step(self, batch, batch_idx, optimizer_idx):
         max_upscale_factor = 2 ** self.num_pyramids
@@ -82,25 +77,26 @@ class ProSR(ptl.LightningModule):
 
         upscale_factor = 2 ** (itr_pyramid_id + 1)
         if optimizer_idx == 0:
-            gen_out, fake_labels, _ = self(x, upscale_factor)
-            g_loss = ((fake_labels - 1) ** 2).mean()
-            vgg_loss = self.vgg_loss(gen_out, y)
-            tqdm_dict = {"g_loss": g_loss, "vgg_loss": vgg_loss}
+            G_out, fake_labels, _ = self(x, upscale_factor)
+            G_loss = ((fake_labels - 1) ** 2).mean()
+            vgg_loss = self.vgg_loss(G_out, y)
+
+            tqdm_dict = dict(vgg_loss=vgg_loss, G_loss=G_loss)
             output = OrderedDict({
-                "loss": g_loss + vgg_loss,
+                "loss": vgg_loss + G_loss,
                 "progress_bar": tqdm_dict,
                 "log": tqdm_dict
             })
             return output
 
         if optimizer_idx == 1:
-            gen_out, fake_labels, _ = self(x, upscale_factor)
+            D_out, fake_labels, _ = self(x, upscale_factor)
             real_labels = self(y, upscale_factor, disc_only=True)
-            d_loss = (fake_labels ** 2 + (real_labels - 1) ** 2).mean()
+            D_loss = (fake_labels ** 2 + (real_labels - 1) ** 2).mean()
 
-            tqdm_dict = {"d_loss": d_loss}
+            tqdm_dict = dict(D_loss=D_loss)
             output = OrderedDict({
-                "loss": d_loss,
+                "loss": D_loss,
                 "progress_bar": tqdm_dict,
                 "log": tqdm_dict
             })
@@ -113,17 +109,17 @@ class ProSR(ptl.LightningModule):
             optimizer.zero_grad()
 
         if optimizer_idx == 1:
-            if batch_idx % self.opts.get("gen_steps_per_update", 10) == 0:
+            if batch_idx % self.h_params.gen_steps_per_update == 0:
                 optimizer.step()
                 optimizer.zero_grad()
         pass
 
     def val_dataloader(self):
-        val_path = self.opts.get("val_path")
-        batch_size = self.opts.get("batch_size")
-        num_workers = self.opts.get("num_workers")
-        return DataLoader(SRDataset(val_path), batch_size=batch_size, shuffle=False,
-                          pin_memory=True, num_workers=num_workers)
+        return DataLoader(SRDataset(self.opts.val_path),
+                          batch_size=self.h_params.batch_size,
+                          num_workers=self.opts.num_workers,
+                          pin_memory=True,
+                          shuffle=False)
 
     def log_images(self, x, y, pred, pred_hi):
         x = F.interpolate(x.detach(), scale_factor=2, mode="bicubic", align_corners=True).clamp(0, 1)
@@ -142,30 +138,31 @@ class ProSR(ptl.LightningModule):
                                        x_size * 2 ** (itr_pyramid_id + 1)),
                                         mode="bilinear", align_corners=False)
         x = F.interpolate(batch, size=(x_size, x_size),
-                                    mode="bilinear", align_corners=False)
+                                        mode="bilinear", align_corners=False)
 
         upscale_factor = 2 ** (itr_pyramid_id + 1)
 
-        gen_out, fake_labels, _ = self(x, upscale_factor)
+        G_out, fake_labels, _ = self(x, upscale_factor)
         real_labels = self(y, upscale_factor, disc_only=True)
-        g_loss = ((fake_labels - 1) ** 2).mean()
-        d_loss = (fake_labels ** 2 + (real_labels - 1) ** 2).mean()
+        G_loss = ((fake_labels - 1) ** 2).mean()
+        D_loss = (fake_labels ** 2 + (real_labels - 1) ** 2).mean()
+        vgg_loss = self.vgg_loss(G_out, y)
 
         if batch_idx == 0:
-            self.log_images(x, y, gen_out, _)
+            self.log_images(x, y, G_out, _)
 
         output = OrderedDict({
-            "g_loss": g_loss,
-            "d_loss": d_loss,
+            "G_loss": G_loss,
+            "D_loss": D_loss,
+            "loss": vgg_loss
         })
         return output
 
     def validation_epoch_end(self, outs):
-        avg_g_loss = torch.stack([x["g_loss"] for x in outs]).mean()
-        avg_d_loss = torch.stack([x["d_loss"] for x in outs]).mean()
-        tqdm_dict = {"d_loss": avg_d_loss, "g_loss": avg_g_loss}
+        avg_loss = torch.stack([x["loss"] for x in outs]).mean()
+        tqdm_dict = {"avg_loss": avg_loss}
         output = OrderedDict({
-            "val_loss": avg_g_loss,
+            "val_loss": avg_loss,
             "progress_bar": tqdm_dict,
             "log": tqdm_dict})
         return output

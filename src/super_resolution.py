@@ -1,11 +1,15 @@
 import src.models as models
 import src.tools.utils as utils
 from pytorch_lightning import Trainer
+from pytorch_lightning.loggers import TensorBoardLogger
+from pytorch_lightning.callbacks import ModelCheckpoint
 from PIL import Image
 import torchvision.transforms as T
 import time
 
 from pathlib import Path
+from src.tools.utils import read_yaml
+from argparse import Namespace
 
 
 import logging
@@ -13,29 +17,36 @@ logger = logging.getLogger(__file__)
 
 
 def super_resolution(opts):
-
+    logger = TensorBoardLogger(save_dir=opts.log_path, name=opts.model)
+    ckpt_path = Path(logger.experiment.log_dir).joinpath("checkpoint",
+                                                         "{epoch}-{val_loss:.2f}").as_posix()
+    checkpoint_callback = ModelCheckpoint(filepath=ckpt_path,
+                                          monitor="val_loss",
+                                          save_top_k=3)
     trainer = Trainer(gpus=opts.gpu_count,
-                      default_save_path=opts.log_path,
+                      checkpoint_callback=checkpoint_callback,
+                      logger=logger,
                       precision=opts.precision,
                       accumulate_grad_batches=opts.accumulate_batches,
                       max_epochs=opts.epochs)
 
+    cfg_path = Path("./src/config").joinpath(opts.model + ".yml").expanduser().as_posix()
+    model_cfg = Namespace(**read_yaml(fpath=cfg_path))
     if opts.mode == "train":
-        kwargs = dict(train_path=opts.train_path,
-                      val_path=opts.val_path,
-                      lr=opts.learning_rate,
-                      batch_size=opts.batch_size,
-                      num_workers=opts.num_workers)
-        model = getattr(models, opts.model)(**kwargs)
+
+        model = getattr(models, opts.model)(model_cfg,
+                                            train_path=opts.train_path,
+                                            val_path=opts.val_path,
+                                            num_workers=opts.num_workers)
         if opts.ckpt_path is not None:
             logger.info("loading checkpoint: %s", opts.ckpt_path)
-            model = model.load_from_checkpoint(checkpoint_path=opts.ckpt_path, **kwargs)
+            model = model.load_from_checkpoint(checkpoint_path=opts.ckpt_path, **opts)
 
         trainer.fit(model)
 
     elif opts.mode == "test":
         device = "cuda" if opts.gpu_count else "cpu"
-        model = getattr(models, opts.model)()
+        model = getattr(models, opts.model)(model_cfg)
         if opts.ckpt_path is not None:
             logger.info("loading checkpoint: %s", opts.ckpt_path)
             model = model.load_from_checkpoint(checkpoint_path=opts.ckpt_path)

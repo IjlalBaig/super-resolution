@@ -9,13 +9,13 @@ logger = logging.getLogger(__file__)
 
 
 class ProSRDiscriminator(nn.Module):
-    def __init__(self, in_planes, planes_cfg):
+    def __init__(self, opts):
         super(ProSRDiscriminator, self).__init__()
 
-        self.num_pyramids = len(planes_cfg)
+        self.num_pyramids = len(opts.planes_cfg)
         for i in range(self.num_pyramids):
-            plane_cfg = planes_cfg[i]
-            self.add_module("init_conv_%d" % i, conv3x3(in_planes, plane_cfg[0]))
+            plane_cfg = opts.planes_cfg[i]
+            self.add_module("init_conv_%d" % i, conv3x3(opts.in_planes, plane_cfg[0]))
 
             self.add_module("pyramid_%d" % i, PyramidDownBlock(in_planes=plane_cfg[0],
                                                                downplanes_config=plane_cfg))

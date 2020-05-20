@@ -7,22 +7,22 @@ from src.models.components import conv3x3, PyramidUpBlock, ReconstructionBlock
 import logging
 logger = logging.getLogger(__file__)
 
+from argparse import Namespace
 
 class ProSRGenerator(nn.Module):
-    def __init__(self, in_planes, planes, blocks_cfg, bn_size, growth_rate):
+    def __init__(self, opts):
         super(ProSRGenerator, self).__init__()
+        self.num_pyramids = len(opts.blocks_cfg)
 
-        self.num_pyramids = len(blocks_cfg)
-
-        self.add_module("init_conv", conv3x3(in_planes, planes))
+        self.add_module("init_conv", conv3x3(opts.in_planes, opts.planes))
         for i in range(self.num_pyramids):
-            block_cfg = blocks_cfg[i]
-            self.add_module("pyramid_%d" % i, PyramidUpBlock(in_planes=planes,
-                                                             out_planes=planes,
+            block_cfg = opts.blocks_cfg[i]
+            self.add_module("pyramid_%d" % i, PyramidUpBlock(in_planes=opts.planes,
+                                                             out_planes=opts.planes,
                                                              denseblock_config=block_cfg,
-                                                             bn_size=bn_size,
-                                                             growth_rate=growth_rate))
-            self.add_module("reconst_%d" % i, ReconstructionBlock)
+                                                             bn_size=opts.bn_size,
+                                                             growth_rate=opts.growth_rate))
+            self.add_module("reconst_%d" % i, ReconstructionBlock(opts.planes, opts.in_planes))
 
             self.init_weights()
 

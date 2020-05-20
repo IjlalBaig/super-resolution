@@ -17,7 +17,7 @@ class SRDataset(Dataset):
 
         self._transform = transform
 
-        self._dataframes = utils.collect_fpaths(self._path, ["jpg", "png"])[:50]
+        self._dataframes = utils.collect_fpaths(self._path, ["jpg", "png"])[:20]
 
     def __len__(self):
         return len(self._dataframes)
