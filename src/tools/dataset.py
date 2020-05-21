@@ -3,7 +3,6 @@ from torchvision import transforms as T
 
 from PIL import Image
 import src.tools.utils as utils
-from pathlib import Path
 
 
 class SRDataset(Dataset):
@@ -17,7 +16,7 @@ class SRDataset(Dataset):
 
         self._transform = transform
 
-        self._dataframes = utils.collect_fpaths(self._path, ["jpg", "png"])[:20]
+        self._dataframes = utils.collect_fpaths(self._path, ["jpg", "png"])
 
     def __len__(self):
         return len(self._dataframes)

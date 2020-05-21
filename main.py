@@ -8,7 +8,6 @@ def _arg_parser():
     parser.add_argument("--train-path", type=str, default="./data/train", help="Directory containing training image")
     parser.add_argument("--val-path",   type=str, default="./data/val", help="Directory containing validation image")
     parser.add_argument("--test-path",  type=str, default="./data/res/small.jpg", help="File/ Directory containing test image{s}")
-
     parser.add_argument("--log-path",   type=str, default="./data/log", help="Directory to save logs")
     parser.add_argument("--ckpt-path",  type=str, help="Checkpoint file to initialize model")
 
