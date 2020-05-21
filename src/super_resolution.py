@@ -30,7 +30,7 @@ def super_resolution(opts):
                       accumulate_grad_batches=opts.accumulate_batches,
                       max_epochs=opts.epochs)
 
-    cfg_path = Path("./src/config").joinpath(opts.model + ".yml").expanduser().as_posix()
+    cfg_path = Path("./config").joinpath(opts.model + ".yml").expanduser().as_posix()
     model_cfg = Namespace(**read_yaml(fpath=cfg_path))
     if opts.mode == "train":
 
