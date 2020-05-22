@@ -2,14 +2,14 @@ h_params:
   gen_steps_per_update: 10
   G_lr: 0.001
   D_lr: 0.001
-  batch_size: 1
+  batch_size: 4
 G:
   in_planes: 3
-  planes: 2
-  blocks_cfg: [[8, 8, 8, 8], [8,8], [8]]
-  growth_rate: 2
+  planes: 32
+  blocks_cfg: [[8, 8, 8, 8, 8, 8], [8,8], [8]]
+  growth_rate: 4
   bn_size: 2
 
 D:
   in_planes: 3
-  planes_cfg: [[64, 128, 256], [64, 64], [64]]
+  planes_cfg: [[64, 128, 256, 512], [64, 64], [64]]

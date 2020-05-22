@@ -11,9 +11,9 @@ def _arg_parser():
     parser.add_argument("--log-path",   type=str, default="./data/log", help="Directory to save logs")
     parser.add_argument("--ckpt-path",  type=str, help="Checkpoint file to initialize model")
 
-    parser.add_argument("-w", "--num-workers", type=int, default=4, help="Number of workers for data loader")
-    parser.add_argument("--epochs", type=int, default=100)
-    parser.add_argument("-ac", "--accumulate-batches", type=int, default=1, help="Number of batch gradients "
+    parser.add_argument("-w", "--num-workers", type=int, default=8, help="Number of workers for data loader")
+    parser.add_argument("--epochs", type=int, default=1000)
+    parser.add_argument("-ac", "--accumulate-batches", type=int, default=4, help="Number of batch gradients "
                                                                                   "accumulated before backward pass. "
                                                                                   "Helps simulate training with larger "
                                                                                   "batch size")

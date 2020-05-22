@@ -2,7 +2,7 @@ from torch.utils.data import Dataset
 from torchvision import transforms as T
 
 from PIL import Image
-import src.tools.utils as utils
+import h5py
 
 
 class SRDataset(Dataset):
@@ -16,13 +16,13 @@ class SRDataset(Dataset):
 
         self._transform = transform
 
-        self._dataframes = utils.collect_fpaths(self._path, ["jpg", "png"])
+        self._dataframes = h5py.File(path, 'r')
 
     def __len__(self):
-        return len(self._dataframes)
+        return len(self._dataframes["im"])
 
     def __getitem__(self, idx):
-        im = Image.open(self._dataframes[idx]).convert(self._im_mode)
+        im = Image.fromarray(self._dataframes["im"][idx])
         if self._transform is not None:
             im_tfmd = self._transform(im)
         else:

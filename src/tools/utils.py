@@ -6,6 +6,7 @@ import subprocess as sp
 from tqdm import tqdm
 import yaml
 
+
 def read_yaml(fpath):
     with open(fpath, 'r') as f:
         try:
