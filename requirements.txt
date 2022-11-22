@@ -1,4 +1,4 @@
-pillow==7.0.0
+pillow==9.3.0
 pytorch_lightning==0.7.3
 tqdm==4.45.0
 pyyaml==5.3.1
